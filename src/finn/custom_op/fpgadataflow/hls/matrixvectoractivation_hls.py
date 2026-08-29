@@ -53,6 +53,7 @@ class MVAU_hls(MVAU, HLSBackend):
         my_attrs = {}
         my_attrs.update(MVAU.get_nodeattr_types(self))
         my_attrs.update(HLSBackend.get_nodeattr_types(self))
+        my_attrs["useAdamMultiplier"] = ("i", False, 0, {0, 1})
         return my_attrs
 
     def lut_estimation(self):
@@ -182,6 +183,8 @@ class MVAU_hls(MVAU, HLSBackend):
                 """Please set mem_mode to "internal_embedded", "internal_decoupled", or "external",
                 currently no other parameter value is supported!"""
             )
+        if self.get_nodeattr("useAdamMultiplier") == 1:
+            self.code_gen_dict["$GLOBALS$"] += ['#include "adammultiplier.hpp"']
         self.code_gen_dict["$GLOBALS$"] += ['#include "mvau.hpp"']
         if self.calc_tmem() != 0:
             # TODO find a better way of checking for no pregenerated thresholds
@@ -290,10 +293,12 @@ class MVAU_hls(MVAU, HLSBackend):
 
     def docompute(self):
         mem_mode = self.get_nodeattr("mem_mode")
+        use_adam = self.get_nodeattr("useAdamMultiplier") == 1
         map_to_hls_mult_style = {
             "auto": "ap_resource_dflt()",
             "lut": "ap_resource_lut()",
             "dsp": "ap_resource_dsp()",
+            "adam": "ap_resource_adam()",
         }
         tmpl_args = self.get_template_param_values()
         if self.calc_tmem() == 0:
@@ -311,7 +316,7 @@ class MVAU_hls(MVAU, HLSBackend):
                     self.hls_sname(),
                     self.hls_sname(),
                     threshs,
-                    map_to_hls_mult_style[self.get_nodeattr("resType")],
+                    map_to_hls_mult_style[self.get_nodeattr("resType")] if not use_adam else map_to_hls_mult_style["adam"],
                 )
             ]
         elif mem_mode == "internal_decoupled" or mem_mode == "external":
@@ -332,7 +337,7 @@ class MVAU_hls(MVAU, HLSBackend):
                     self.hls_sname(),
                     self.hls_sname(),
                     threshs,
-                    map_to_hls_mult_style[self.get_nodeattr("resType")],
+                    map_to_hls_mult_style[self.get_nodeattr("resType")] if not use_adam else map_to_hls_mult_style["adam"],
                 )
             ]
 
